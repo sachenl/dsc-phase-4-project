@@ -1,165 +1,444 @@
-# Phase 4 Project
+# Project 4 final
+## Overview
+For this project, we trained a pretrained cnn model to predict the Classification of the x-ray images.
+
+## Business understanding
+The medical dataset comes from Kermany et al. contains a set of x-ray images of pediatric patients. The images will show whether the patients have pneumonia or not. our task is to build a model that can classify whether a given patient has pneumonia, given a chest x-ray image. Since this is an Image Classification problem, we are going to solve it with Deep Learning.
+
+## The Dataset
+The dataset that we are going to use the image classification is the chese_xray which contains two categories: Pneumonia and Normal.The data was downloaded from https://data.mendeley.com/datasets/rscbjbr9sj/3 to the local drive and unzip. The data set is assigned into two folders (train and test) and contains subfoler for each of the category Pneumonia and Normal. In each of the folders, there are a lot of xray images. To check how many samples in each of the categories, we used the OS.listdir methods.
+
+
+
+```
+# load all the necessary libraries
+import numpy as np
+import os, shutil
+import pandas as pd
+from keras.preprocessing.image import ImageDataGenerator
+from tensorflow.keras.applications import VGG19
+from tensorflow.keras import layers
+from tensorflow.keras import models
+from tensorflow.keras import optimizers
+import matplotlib.pyplot as plt
+from sklearn.metrics import classification_report,confusion_matrix
+import seaborn as sns
+```
 
-Final phase down -- you're absolutely crushing it! You've made it all the way through one of the toughest phase of this course. You must have an amazing brain in your head!
+```
+list_train_normal = os.listdir('chest_xray/train/normal')
+list_train_PNEUMONIA = os.listdir('chest_xray/train/PNEUMONIA')
+list_test_normal = os.listdir('chest_xray/test/normal')
+list_test_PNEUMONIA = os.listdir('chest_xray/test/PNEUMONIA')
 
-<img src='https://raw.githubusercontent.com/learn-co-curriculum/dsc-phase-4-project/main/images/brain.gif'>
+
+len(list_train_normal), len(list_train_PNEUMONIA), len(list_test_normal), len(list_test_PNEUMONIA)
+```
+(1349, 3884, 235, 390)
+
+In train folder, there are normal folder which contains 1349 images and PNEUMONIA folder which contains 3884 images. In test folder, there are normal folder which contains 235 images and PNEUMONIA folder which contains 390 images. The images in each folder is too large for the modeling since our local computer is not very powerful for the mulitple testing. We need to downsampling the dataset first to find the optimal model and parameter first. Then using the full dataset to train and test our model. Base on our earlier expience, we will use 20% of the total dataset to modeling our model. We also need to make 10% of the traning data to validation dataset.
+
 
-## Project Overview
+## Plan
+
+1. Downsampleing the data set by randomly choosing 20% of the original trainning and testing images to the new data_org_subset folder. Make a new folder of validation and random select 5% of the images from trainning folder.
+2. Define the train generator, validation generator and test generator.
+3. Build the deep learning model base on the pretrained CNN (VGG19) by adding a few fully connected layers. Train the model with selected images.
+4. Retrain the model with full training data. 
+5. Evaluate the model with the test images.
+
+
+### 1. Rebuild the data subset folder with 20% of the original images
+
+```
+# define the old and new direction of dataset
 
-For this phase, you will choose a project that requires building one of these four models:
+# define a new method to transfer the images between two folder
+def transfer(no_of_files, source, dest):
+    for i in range(no_of_files):
+        #Variable random_file stores the name of the random file chosen
+        random_file=np.random.choice(os.listdir(source))
+        # print("%d} %s"%(i+1,random_file))
+        source_file="%s/%s"%(source,random_file)
+        dest_file=dest
+        #"shutil.move" function moves file from one directory to another
+        shutil.copy(source_file,dest_file)
 
-- Time Series Modeling
-- Recommendation System
-- Image Classification with Deep Learning
-- Natural Language Processing
 
-### The Data
+# set the  propotion of images transfered to the new folders p_val, p_train, p_test and
+# define a new method to creat and transfer images
+def make_subset (old_dir, new_root_dir, p_val, p_train, p_test) :       
+
+    # make the root dir folder
+    os.mkdir(new_root_dir)
+
+    # define the name of subset to save all the images in different categories        
+    dir_names = ['train', 'val', 'test']
+    cat_names = ['normal', 'PNEUMONIA']
+    for d in dir_names:
 
-We have provided a dataset suitable to each model, but you are also encouraged to source your own dataset. If you choose your own dataset, **run the dataset and business problem by your instructor for approval** before starting your project.
+        new_dir = os.path.join(new_root_dir, d)
+        os.mkdir(new_dir)
 
-### How to Choose a Project
+        # make the source dir to train and test folder, since we donot have validation in the original folder, 
+        # we make it to train folder 
+        if d == 'val':
+            source_dir = os.path.join(old_dir, 'train')
+        else:
+            source_dir = os.path.join(old_dir, d)
 
-When choosing a project, consider:
 
-1. **Depth:** Choose a project that similar to what you want to do for your capstone project (Phase 5). This will allow you to practice those methods in a group setting before needing to use it independently. This will help you build a better Capstone project and a portfolio that demonstrates the ability to deeply learn and implement one modeling approach.
+        for cat in cat_names:
+            new_cat = os.path.join(new_dir, cat)
+            source = os.path.join(source_dir, cat )
+            os.mkdir(new_cat)
+            no_of_files = len(os.listdir(source))
+            # set the nunmber of copy to 20% from source folder. For the validation folder, copy 5% of the images of source
+            if d == 'val':
+                no_of_copy = int(p_val * no_of_files)
+                
+            if d == 'train':
+                no_of_copy = int(p_train * no_of_files) 
+                
+            if d == 'test':
+                no_of_copy = int(p_test * no_of_files )
+                
+            #print('d = ', d)    
+            print('copy {} of files in {} total files  from {} to {}'.format(no_of_copy,no_of_files, source, new_cat)) 
+            transfer(no_of_copy, source, new_cat)
+        
+old_dir = 'chest_xray/'
+new_root_dir = 'data_org_subset/'
+make_subset(old_dir, new_root_dir, p_val = 0.05, p_train = 0.2, p_test = 0.2)
+```
 
-2. **Breadth:** Choose a problem that you don't necessarily plan to use in your capstone project. This will allow you to develop applied experience with multiple modeling approaches. This will help you refine your areas of interest and build a portfolio that demonstrates the ability to learn and implement multiple modeling approaches.
+![copy20](https://raw.githubusercontent.com/sachenl/dsc-phase-4-project/main/image/copy%2020.png)
 
-If you are feeling overwhelmed or behind, we recommend you choose Problem \#3: Image Classification with Deep Learning.
 
-### Problem 1: Time Series Modeling
 
-If you choose the Time Series option, you will be forecasting real estate prices of various zip codes using data from [Zillow Research](https://www.zillow.com/research/data/). For this project, you will be acting as a consultant for a fictional real-estate investment firm. The firm has asked you what seems like a simple question:
+Now, we copied 20% of the training and testing images from the orignal folder. We also made a new folder for validation and randomly seleted 5% of the images from training folder.
 
-> What are the top 5 best zip codes for us to invest in?
+## 2. Define the train generator, validation generator and test generator.
 
-This may seem like a simple question at first glance, but there's more than a little ambiguity here that you'll have to think through in order to provide a solid recommendation. Should your recommendation be focused on profit margins only? What about risk? What sort of time horizon are you predicting against?  Your recommendation will need to detail your rationale and answer any sort of lingering questions like these in order to demonstrate how you define "best".
+```
 
-There are many datasets on the [Zillow Research Page](https://www.zillow.com/research/data/), and making sure you have exactly what you need can be a bit confusing. For simplicity's sake, we have already provided the dataset for you in this repo -- you will find it in the file `time-series/zillow_data.csv`.
+# define the direction for train , vlalidation and test folder
 
-The goal of this project is to have you complete a very common real-world task in regard to time series modeling. However, real world problems often come with a significant degree of ambiguity, which requires you to use your knowledge of statistics and data science to think critically about and answer. While the main task in this project is time series modeling, that isn't the overall goal -- it is important to understand that time series modeling is a tool in your toolbox, and the forecasts it provides you are what you'll use to answer important questions.
+train_dir = '{}train'.format(new_root_dir)
+validation_dir = '{}val/'.format(new_root_dir)
+test_dir = '{}test/'.format(new_root_dir)
 
-In short, to pass this project, demonstrating the quality and thoughtfulness of your overall recommendation is at least as important as successfully building a time series model!
+train_datagen = ImageDataGenerator(rescale=1./255,
+                                   rotation_range=40,
+                                   width_shift_range=0.2,
+                                   height_shift_range=0.2,
+                                   shear_range=0.2,
+                                   zoom_range=0.2,
+                                   horizontal_flip=True,
+                                   fill_mode='nearest')
 
-#### Starter Jupyter Notebook
 
-For this project, you will be provided with a Jupyter notebook, `time-series/starter_notebook.ipynb`, containing some starter code. If you inspect the Zillow dataset file, you'll notice that the datetimes for each sale are the actual column names -- this is a format you probably haven't seen before. To ensure that you're not blocked by preprocessing, we've provided some helper functions to help simplify getting the data into the correct format. You're not required to use this notebook or keep it in its current format, but we strongly recommend you consider making use of the helper functions so you can spend your time working on the parts of the project that matter.
+train_generator = train_datagen.flow_from_directory(train_dir, 
+                                                    target_size=(300, 300), 
+                                                    batch_size= 20,
+                                                    class_mode='categorical') 
 
-#### Evaluation
+# Get all the data in the directory split/validation (200 images), and reshape them
+val_generator = ImageDataGenerator(rescale=1./255).flow_from_directory(validation_dir, 
+                                                                       target_size=(300, 300), 
+                                                                       batch_size=20,
+                                                                       class_mode='categorical')
 
-In addition to deciding which quantitative metric(s) you want to target (e.g. minimizing mean squared error), you need to start with a definition of "best investment".  Consider additional metrics like risk vs. profitability, or ROI yield.
 
-### Problem 2: Recommendation System
 
-If you choose the Recommendation System option, you will be making movie recommendations based on the [MovieLens](https://grouplens.org/datasets/movielens/latest/) dataset from the GroupLens research lab at the University of Minnesota.  Unless you are planning to run your analysis on a paid cloud platform, we recommend that you use the "small" dataset containing 100,000 user ratings (and potentially, only a particular subset of that dataset).
+```
 
-Your task is to:
+Found 957 images belonging to 2 classes.
 
-> Build a model that provides top 5 movie recommendations to a user, based on their ratings of other movies.
+Found 255 images belonging to 2 classes.
 
-The MovieLens dataset is a "classic" recommendation system dataset, that is used in numerous academic papers and machine learning proofs-of-concept.  You will need to create the specific details about how the user will provide their ratings of other movies, in addition to formulating a more specific business problem within the general context of "recommending movies".
+```
+# plotsome of the train set images we resampled in the train dataset 
+plt.figure(figsize=(12, 8))
+for i in range(0, 8):
+    plt.subplot(2, 4, i+1)
+    for X_batch, Y_batch in train_generator:
+        image = X_batch[0]        
+        dic = {0:'NORMAL', 1:'PNEUMONIA'}
+        plt.title(dic[Y_batch[0][0]])
+        plt.axis('off')
+        plt.imshow(np.squeeze(image),cmap='gray',interpolation='nearest')
+        break
+plt.tight_layout()
+plt.show()
+```
 
-#### Collaborative Filtering
+![fig 2 samples](https://raw.githubusercontent.com/sachenl/dsc-phase-4-project/main/image/fig%202%20sample%20images.png)
 
-At minimum, your recommendation system must use collaborative filtering.  If you have time, consider implementing a hybrid approach, e.g. using collaborative filtering as the primary mechanism, but using content-based filtering to address the [cold start problem](https://en.wikipedia.org/wiki/Cold_start_(computing)).
 
-#### Evaluation
 
-The MovieLens dataset has explicit ratings, so achieving some sort of evaluation of your model is simple enough.  But you should give some thought to the question of metrics. Since the rankings are ordinal, we know we can treat this like a regression problem.  But when it comes to regression metrics there are several choices: RMSE, MAE, etc.  [Here](http://fastml.com/evaluating-recommender-systems/) are some further ideas.
+##  3. Build the model base on pretrain network VGG19.
 
-### Problem 3: Image Classification with Deep Learning
+```
 
-If you choose this option, you'll put everything you've learned together to build a deep neural network that trains on a large dataset for classification on a non-trivial task.  In this case, using x-ray images of pediatric patients to identify whether or not they have pneumonia.  The dataset comes from Kermany et al. on [Mendeley](https://data.mendeley.com/datasets/rscbjbr9sj/3), although there is also a version on [Kaggle](https://www.kaggle.com/paultimothymooney/chest-xray-pneumonia) that may be easier to use.
+# defined the pretrained model VGG19 and add more layer to the network.
+cnn_base = VGG19(weights='imagenet', 
+                 include_top=False, 
+                 input_shape=(300, 300, 3))
 
-Your task is to:
+# Define Model Architecture
+model = models.Sequential()
+model.add(cnn_base)
+model.add(layers.Flatten())
+model.add(layers.Dense(64, activation='relu'))
+model.add(layers.Dense(128, activation='relu'))
+model.add(layers.Dense(256, activation='relu'))
+model.add(layers.Dense(128, activation='relu'))
+model.add(layers.Dense(2, activation='softmax'))
 
-> Build a model that can classify whether a given patient has pneumonia, given a chest x-ray image.
+cnn_base.trainable = False
 
-#### Aim for a Proof of Concept
+model.summary()
 
-With Deep Learning, data is king -- the more of it, the better. However, the goal of this project isn't to build the best model possible -- it's to demonstrate your understanding by building a model that works. You should try to avoid datasets and model architectures that won't run in reasonable time on your own machine. For many problems, this means downsampling your dataset and only training on a portion of it. Once you're absolutely sure that you've found the best possible architecture and other hyperparameters for your model, then consider training your model on your entire dataset overnight (or, as larger portion of the dataset that will still run in a feasible amount of time).
+```
 
-At the end of the day, we want to see your thought process as you iterate and improve on a model. A project that achieves a lower level of accuracy but has clearly iterated on the model and the problem until it found the best possible approach is more impressive than a model with high accuracy that did no iteration. We're not just interested in seeing you finish a model -- we want to see that you understand it, and can use this knowledge to try and make it even better!
+![model summary ](https://raw.githubusercontent.com/sachenl/dsc-phase-4-project/main/image/fig%202%20extra%20model%20summary.png)     
+                                                                 
 
-#### Evaluation
+```
+# Compilation
+model.compile(loss='categorical_crossentropy',
+              optimizer=optimizers.RMSprop(learning_rate=2e-5),
+              metrics=['acc'])
 
-Evaluation is fairly straightforward for this project.  But you'll still need to think about which metric to use and about how best to cross-validate your results.
+# Fitting the Model
+history = model.fit(train_generator,
+                              steps_per_epoch=15,
+                              epochs=10,
+                              validation_data=val_generator,
+                              validation_steps=8)
 
-### Problem 4: Natural Language Processing (NLP)
+```
 
-If you choose this option, you'll build an NLP model to analyze Twitter sentiment about Apple and Google products. The dataset comes from CrowdFlower via [data.world](https://data.world/crowdflower/brands-and-product-emotions). Human raters rated the sentiment in over 9,000 Tweets as positive, negative, or neither.
 
-Your task is to:
+![results_1](https://raw.githubusercontent.com/sachenl/dsc-phase-4-project/main/image/results_1_partial.png)
 
-> Build a model that can rate the sentiment of a Tweet based on its content.
+Now, we plot the accuracy and loss curve of the model to traning dataset.
+```
+# 
 
-#### Aim for a Proof of Concept
+train_acc = history.history['acc']
+val_acc = history.history['val_acc']
+train_loss = history.history['loss']
+val_loss = history.history['val_loss']
+epch = range(1, len(train_acc) + 1)
+plt.plot(epch, train_acc, 'g.', label='Training Accuracy')
+plt.plot(epch, val_acc, 'g', label='Validation acc')
+plt.title('Accuracy')
+plt.legend()
+plt.figure()
+plt.plot(epch, train_loss, 'r.', label='Training loss')
+plt.plot(epch, val_loss, 'r', label='Validation loss')
+plt.title('Loss')
+plt.legend()
+plt.show()
+```
 
-There are many approaches to NLP problems - start with something simple and iterate from there. For example, you could start by limiting your analysis to positive and negative Tweets only, allowing you to build a binary classifier. Then you could add in the neutral Tweets to build out a multiclass classifier. You may also consider using some of the more advanced NLP methods in the Mod 4 Appendix.
+![fit3 acc](https://raw.githubusercontent.com/sachenl/dsc-phase-4-project/main/image/fig%203%20acc_partial.png)
 
-#### Evaluation
+The acc and loss curve of training gave us pretty good score and the validation scores are going to the similar range in each steps. Thus we can use the same model on the full traning dataset for better training.
 
-Evaluating multiclass classifiers can be trickier than binary classifiers because there are multiple ways to mis-classify an observation, and some errors are more problematic than others. Use the business problem that your NLP project sets out to solve to inform your choice of evaluation metrics.
+Save model
+```
+#
+model.save('results_on_partial_dataset.h5')
+```
 
-### Sourcing Your Own Data
 
-Sourcing new data is a valuable skill for data scientists, but it requires a great deal of care. An inappropriate dataset or an unclear business problem can lead you spend a lot of time on a project that delivers underwhelming results. The guidelines below will help you complete a project that demonstrates your ability to engage in the full data science process.
 
-Your dataset must be...
+## 4. Retrain the model with full  dataset.
 
-1. **Appropriate for one of this project's models.** These are time series, recommendation systems, deep learning, or natural language processing.   
+Now is the time to use our model for the full dataset. We  remade the folder of train, val, test folder for full dataset. 
+Transfer 90% of train images to new train and 10% of train images to new validation folder. 
+Transfer 100% of test to new test folder
+```
 
-2. **Usable to solve a specific business problem.** This solution must rely on your model.
+old_dir = 'chest_xray/'
+new_root_dir = 'data_org_full/'
+make_subset(old_dir, new_root_dir, p_val = 0.1, p_train = 0.9, p_test = 1)
 
-3. **Somewhat complex.** It should contain thousands of rows and features that require creativity to use.
+```
 
-4. **Unfamiliar.** It can't be one we've already worked with during the course or that is commonly used for demonstration purposes (e.g. MNIST).
+![copy_full](https://raw.githubusercontent.com/sachenl/dsc-phase-4-project/main/image/copy%20all.png)
 
-5. **Manageable.** Stick to datasets that you can model using the techniques introduced in Phase 4.
 
-Once you've sourced your own dataset and identified the business problem you want to solve with it, you must to **run them by your instructor for approval**.
 
-#### Problem First, or Data First?
+```
+train_dir = '{}train'.format(new_root_dir)
+validation_dir = '{}val/'.format(new_root_dir)
+test_dir = '{}test/'.format(new_root_dir)
 
-There are two ways that you can source your own dataset: **_Problem First_** or **_Data First_**. The less time you have to complete the project, the more strongly we recommend a Data First approach to this project.
+full_train_datagen = ImageDataGenerator(rescale=1./255,
+                                   rotation_range=40,
+                                   width_shift_range=0.2,
+                                   height_shift_range=0.2,
+                                   shear_range=0.2,
+                                   zoom_range=0.2,
+                                   horizontal_flip=True,
+                                   fill_mode='nearest')
 
-**_Problem First_**: Start with a problem that you are interested in that you could potentially solve using one of the four project models. Then look for data that you could use to solve that problem. This approach is high-risk, high-reward: Very rewarding if you are able to solve a problem you are invested in, but frustrating if you end up sinking lots of time in without finding appropriate data. To mitigate the risk, set a firm limit for the amount of time you will allow yourself to look for data before moving on to the Data First approach.
 
-**_Data First_**: Take a look at some of the most popular internet repositories of cool data sets we've listed below. If you find a data set that's particularly interesting for you, then it's totally okay to build your problem around that data set.
 
-There are plenty of amazing places that you can get your data from. We recommend you start looking at data sets in some of these resources first:
 
-* [UCI Machine Learning Datasets Repository](https://archive.ics.uci.edu/ml/datasets.php)
-* [Kaggle Datasets](https://www.kaggle.com/datasets)
-* [Awesome Datasets Repo on Github](https://github.com/awesomedata/awesome-public-datasets)
-* [Tensorflow Datasets](https://www.tensorflow.org/datasets/catalog/overview)
+full_train_generator = full_train_datagen.flow_from_directory(train_dir, 
+                                                    target_size=(300, 300), 
+                                                    batch_size= 20,
+                                                    class_mode='categorical') 
 
-## The Deliverables
+# Get all the data in the directory split/validation (, and reshape them
+full_val_generator = ImageDataGenerator(rescale=1./255).flow_from_directory(validation_dir, 
+                                                                       target_size=(300, 300), 
+                                                                       batch_size=20,
+                                                                       class_mode='categorical')
+```
 
-There are three deliverables for this project:
+Found 3132 images belonging to 2 classes.
 
-* A **GitHub repository**
-* A **Jupyter Notebook**
-* A **non-technical presentation**
+Found 492 images belonging to 2 classes.
 
-Review the "Project Submission & Review" page in the "Milestones Instructions" topic for instructions on creating and submitting your deliverables. Refer to the rubric associated with this assignment for specifications describing high-quality deliverables.
+```
+# recompile the model and fit to the full training dataset.
+model.compile(loss='categorical_crossentropy',
+              optimizer=optimizers.RMSprop(learning_rate=2e-5),
+              metrics=['acc'])
 
-### Key Points
+history = model.fit(full_train_generator,
+                              steps_per_epoch=15,
+                              epochs=20,
+                              validation_data=full_val_generator,
+                              validation_steps=10)
+```
+![result_2](https://raw.githubusercontent.com/sachenl/dsc-phase-4-project/main/image/results_2_full.png)
 
-* **Choose your project quickly.** We've given you a lot of choices - don't get stuck spending too much time choosing which project to do. Give yourself a firm time limit for picking a project (e.g. 2 hours) so you can get on with making something great. Don't worry about picking the perfect project - remember that you will get to do a new, larger Capstone project very soon!
+```
+#save model
+model.save('results_on_full_dataset.h5')
+```
 
-* **Your Jupyter Notebook should demonstrate an iterative approach to modeling.** This means that you begin with a basic model, evaluate it, and then provide justification for and proceed to a new model. This is a great way to add narrative structure to your notebook, especially if you compare model performance across each iteration.
+Plot the accuracy of the model again.
+```
+plot_acc(history)
+```
 
-* **You must choose and implement an appropriate validation strategy.** This is one of the trickiest parts of machine learning models, especially for models that don't lend themselves easily to traditional cross-validation (e.g. time series & recommendation systems).
+![acc_2](https://raw.githubusercontent.com/sachenl/dsc-phase-4-project/main/image/fig%204%20acc_full.png)
 
-## Getting Started
 
-Create a new repository for your project to get started. We recommend structuring your project repository similar to the structure in [the Phase 1 Project Template](https://github.com/learn-co-curriculum/dsc-project-template). You can do this either by creating a new fork of that repository to work in or by building a new repository from scratch that mimics that structure.
+In this fitting, both of the training accuracy and validation accuracy are very high. Even though the fluctuation of validation accurancy are larger than trainning, they had the same trend in general.
 
-## Project Submission and Review
+## 5. Evaluate the model with the test images.
+We first generate the test labels as the real class of the images.
+```
+# Get all the data in the directory split/test (180 images), and reshape them
 
-Review the "Project Submission & Review" page in the "Milestones Instructions" topic to learn how to submit your project and how it will be reviewed. Your project must pass review for you to progress to the next Phase.
 
-## Summary
+test_generator = ImageDataGenerator(rescale=1./255).flow_from_directory(test_dir, 
+                                                                        target_size=(300, 300), 
+                                                                        batch_size=399,
+                                                                        class_mode='categorical',
+                                                                        shuffle=False)
 
-This project is your chance to show off your data science prowess with some advanced machine learning algorithms. Now that you've gone through all of the core course content, we're excited to see what you are able to do!
+
+# generate the test_labels which is the y_true data
+test_images, test_labels = next(test_generator)
+```
+
+
+We then calculated the accuracy of the model on the testing images.
+```
+test_datagen = ImageDataGenerator(rescale=1./255,
+                                   rotation_range=40,
+                                   width_shift_range=0.2,
+                                   height_shift_range=0.2,
+                                   shear_range=0.2,
+                                   zoom_range=0.2,
+                                   horizontal_flip=True,
+                                   fill_mode='nearest')
+test_generator2 = test_datagen.flow_from_directory(test_dir,
+                                                  target_size=(300, 300),
+                                                  batch_size=20,
+                                                  class_mode='categorical',
+                                                  shuffle=False)
+
+test_loss, test_acc = model.evaluate(test_generator2, steps=10)
+```
+
+Found 399 images belonging to 2 classes.
+
+10/10 [=====] - 42s 4s/step - loss: 0.0685 - acc: 0.9750
+
+The test accuracy of the model on test dataset are 95% which is very high also.
+
+### Then we calculate the predictions with the model and then make the confusion box
+
+```
+# calculate the predicitons
+preds  = model.predict(test_generator2, verbose = 1 )
+
+predictions = preds.copy()
+predictions[predictions <= 0.6] = 0
+predictions[predictions > 0.6] = 1
+
+cm = pd.DataFrame(data=confusion_matrix(test_labels[:,0], predictions[:,0], labels=[0,1]),index=["Actual Normal", "Actual Pneumonia"],
+columns=["Predicted Normal", "Predicted Pneumonia"])
+sns.heatmap(cm,annot=True,fmt="d")
+```
+
+
+![confusion_box](https://raw.githubusercontent.com/sachenl/dsc-phase-4-project/main/image/fig%205%20confusionbox.png)
+
+```
+# print the scores for normal and pneumonia categories
+print(classification_report(y_true=test_labels[:,0],y_pred=predictions[:,0],target_names =['NORMAL', 'PNEUMONIA']))
+```
+![scores](https://raw.githubusercontent.com/sachenl/dsc-phase-4-project/main/image/scores.png)
+
+The confusion box showes that the TP and TN prediction are much higher compare to the FN and FP results. The f1-score for both normal and pneumonia data are 0.79 and 0.9 which are very reasonble too.
+
+### Finally, we  plot few of the examples of images with  percentage of predictions
+
+```
+# print some of the predicted images with percentage of predictions
+test_generator.reset()
+x=np.concatenate([test_generator.next()[0] for i in range(test_generator.__len__())])
+y=np.concatenate([test_generator.next()[1] for i in range(test_generator.__len__())])
+print(x.shape)
+print(y.shape)
+dic = {0:'NORMAL', 1:'PNEUMONIA'}
+plt.figure(figsize=(20,14))
+
+#for i in range(0+200, 9+200):
+for idx, i in enumerate(np.random.randint(1, 388, 6)):    
+    plt.subplot(2, 3, idx+1)
+    if preds[i, 0] >= 0.5: 
+        out = ('{:.2%} probability of being Pneumonia case'.format(preds[i][0]))
+      
+      
+    else: 
+        out = ('{:.2%} probability of being Normal case'.format(1-preds[i][0]))
+    plt.title(out +"\n Actual case :" + dic[y[i][0]])    
+    plt.imshow(np.squeeze(x[i]))
+    plt.axis('off')
+plt.show()
+```
+
+![fig_6_plot_final](https://raw.githubusercontent.com/sachenl/dsc-phase-4-project/main/image/fig%206%20samples%20final.png)
+
+We randomly plot future of the pictures from the test folder and give the prediction and actual case of the picture. The prediction and actual results are same with each other in our samples.
+
+## Conclusion
+Based on 20% of the whole dataset, we created a CNN model based on a pretrained model (VGG19) which can classify X-ray images as a Pneumonia case or a Normal case. The model was then retrained with whole dataset and tested with the seperated test images. The accuracy of the predicion is around 95%. 
+
+
+
+
+
