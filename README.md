@@ -34,215 +34,50 @@ Define the old and new direction of dataset and a new method to creat and transf
 
 ## 2. Define the train generator, validation generator and test generator.
 
-```
 
-# define the direction for train , vlalidation and test folder
-
-train_dir = '{}train'.format(new_root_dir)
-validation_dir = '{}val/'.format(new_root_dir)
-test_dir = '{}test/'.format(new_root_dir)
-
-train_datagen = ImageDataGenerator(rescale=1./255,
-                                   rotation_range=40,
-                                   width_shift_range=0.2,
-                                   height_shift_range=0.2,
-                                   shear_range=0.2,
-                                   zoom_range=0.2,
-                                   horizontal_flip=True,
-                                   fill_mode='nearest')
-
-
-train_generator = train_datagen.flow_from_directory(train_dir, 
-                                                    target_size=(300, 300), 
-                                                    batch_size= 20,
-                                                    class_mode='categorical') 
-
-# Get all the data in the directory split/validation (200 images), and reshape them
-val_generator = ImageDataGenerator(rescale=1./255).flow_from_directory(validation_dir, 
-                                                                       target_size=(300, 300), 
-                                                                       batch_size=20,
-                                                                       class_mode='categorical')
-
-
-
-```
-
-Found 957 images belonging to 2 classes.
-
-Found 255 images belonging to 2 classes.
-
-```
-# plotsome of the train set images we resampled in the train dataset 
-plt.figure(figsize=(12, 8))
-for i in range(0, 8):
-    plt.subplot(2, 4, i+1)
-    for X_batch, Y_batch in train_generator:
-        image = X_batch[0]        
-        dic = {0:'NORMAL', 1:'PNEUMONIA'}
-        plt.title(dic[Y_batch[0][0]])
-        plt.axis('off')
-        plt.imshow(np.squeeze(image),cmap='gray',interpolation='nearest')
-        break
-plt.tight_layout()
-plt.show()
-```
+We plot some of the images in the training dataset. However, I can not tell which one is a case of pneumonia and which one is a normal case just by looking at the pictures. Now we are going to train the computer with a pretrainned cnn model to predict whether the picture belong to pneumonia or normal case.
 
 ![fig 2 samples](https://raw.githubusercontent.com/sachenl/dsc-phase-4-project/main/image/fig%202%20sample%20images.png)
 
 
 
-##  3. Build the model base on pretrain network VGG19.
+##  3. Build the model base on pretrain network VGG19 and fit the model to the trainning images.
 
-```
 
-# defined the pretrained model VGG19 and add more layer to the network.
-cnn_base = VGG19(weights='imagenet', 
-                 include_top=False, 
-                 input_shape=(300, 300, 3))
-
-# Define Model Architecture
-model = models.Sequential()
-model.add(cnn_base)
-model.add(layers.Flatten())
-model.add(layers.Dense(64, activation='relu'))
-model.add(layers.Dense(128, activation='relu'))
-model.add(layers.Dense(256, activation='relu'))
-model.add(layers.Dense(128, activation='relu'))
-model.add(layers.Dense(2, activation='softmax'))
-
-cnn_base.trainable = False
-
-model.summary()
-
-```
 
 ![model summary ](https://raw.githubusercontent.com/sachenl/dsc-phase-4-project/main/image/fig%202%20extra%20model%20summary.png)     
                                                                  
 
-```
-# Compilation
-model.compile(loss='categorical_crossentropy',
-              optimizer=optimizers.RMSprop(learning_rate=2e-5),
-              metrics=['acc'])
-
-# Fitting the Model
-history = model.fit(train_generator,
-                              steps_per_epoch=15,
-                              epochs=10,
-                              validation_data=val_generator,
-                              validation_steps=8)
-
-```
 
 
 ![results_1](https://raw.githubusercontent.com/sachenl/dsc-phase-4-project/main/image/results_1_partial.png)
 
 Now, we plot the accuracy and loss curve of the model to traning dataset.
-```
-# 
 
-train_acc = history.history['acc']
-val_acc = history.history['val_acc']
-train_loss = history.history['loss']
-val_loss = history.history['val_loss']
-epch = range(1, len(train_acc) + 1)
-plt.plot(epch, train_acc, 'g.', label='Training Accuracy')
-plt.plot(epch, val_acc, 'g', label='Validation acc')
-plt.title('Accuracy')
-plt.legend()
-plt.figure()
-plt.plot(epch, train_loss, 'r.', label='Training loss')
-plt.plot(epch, val_loss, 'r', label='Validation loss')
-plt.title('Loss')
-plt.legend()
-plt.show()
-```
 
 ![fit3 acc](https://raw.githubusercontent.com/sachenl/dsc-phase-4-project/main/image/fig%203%20acc_partial.png)
 
 The acc and loss curve of training gave us pretty good score and the validation scores are going to the similar range in each steps. Thus we can use the same model on the full traning dataset for better training.
 
-Save model
-```
-#
-model.save('results_on_partial_dataset.h5')
-```
-
-
+Then we save the current model.
 
 ## 4. Retrain the model with full  dataset.
 
 Now is the time to use our model for the full dataset. We  remade the folder of train, val, test folder for full dataset. 
 Transfer 90% of train images to new train and 10% of train images to new validation folder. 
 Transfer 100% of test to new test folder
-```
 
-old_dir = 'chest_xray/'
-new_root_dir = 'data_org_full/'
-make_subset(old_dir, new_root_dir, p_val = 0.1, p_train = 0.9, p_test = 1)
-
-```
 
 ![copy_full](https://raw.githubusercontent.com/sachenl/dsc-phase-4-project/main/image/copy%20all.png)
 
 
 
-```
-train_dir = '{}train'.format(new_root_dir)
-validation_dir = '{}val/'.format(new_root_dir)
-test_dir = '{}test/'.format(new_root_dir)
 
-full_train_datagen = ImageDataGenerator(rescale=1./255,
-                                   rotation_range=40,
-                                   width_shift_range=0.2,
-                                   height_shift_range=0.2,
-                                   shear_range=0.2,
-                                   zoom_range=0.2,
-                                   horizontal_flip=True,
-                                   fill_mode='nearest')
-
-
-
-
-full_train_generator = full_train_datagen.flow_from_directory(train_dir, 
-                                                    target_size=(300, 300), 
-                                                    batch_size= 20,
-                                                    class_mode='categorical') 
-
-# Get all the data in the directory split/validation (, and reshape them
-full_val_generator = ImageDataGenerator(rescale=1./255).flow_from_directory(validation_dir, 
-                                                                       target_size=(300, 300), 
-                                                                       batch_size=20,
-                                                                       class_mode='categorical')
-```
-
-Found 3132 images belonging to 2 classes.
-
-Found 492 images belonging to 2 classes.
-
-```
-# recompile the model and fit to the full training dataset.
-model.compile(loss='categorical_crossentropy',
-              optimizer=optimizers.RMSprop(learning_rate=2e-5),
-              metrics=['acc'])
-
-history = model.fit(full_train_generator,
-                              steps_per_epoch=15,
-                              epochs=20,
-                              validation_data=full_val_generator,
-                              validation_steps=10)
-```
 ![result_2](https://raw.githubusercontent.com/sachenl/dsc-phase-4-project/main/image/results_2_full.png)
 
-```
-#save model
-model.save('results_on_full_dataset.h5')
-```
 
 Plot the accuracy of the model again.
-```
-plot_acc(history)
-```
+
 
 ![acc_2](https://raw.githubusercontent.com/sachenl/dsc-phase-4-project/main/image/fig%204%20acc_full.png)
 
@@ -251,42 +86,8 @@ In this fitting, both of the training accuracy and validation accuracy are very 
 
 ## 5. Evaluate the model with the test images.
 We first generate the test labels as the real class of the images.
-```
-# Get all the data in the directory split/test (180 images), and reshape them
-
-
-test_generator = ImageDataGenerator(rescale=1./255).flow_from_directory(test_dir, 
-                                                                        target_size=(300, 300), 
-                                                                        batch_size=399,
-                                                                        class_mode='categorical',
-                                                                        shuffle=False)
-
-
-# generate the test_labels which is the y_true data
-test_images, test_labels = next(test_generator)
-```
-
 
 We then calculated the accuracy of the model on the testing images.
-```
-test_datagen = ImageDataGenerator(rescale=1./255,
-                                   rotation_range=40,
-                                   width_shift_range=0.2,
-                                   height_shift_range=0.2,
-                                   shear_range=0.2,
-                                   zoom_range=0.2,
-                                   horizontal_flip=True,
-                                   fill_mode='nearest')
-test_generator2 = test_datagen.flow_from_directory(test_dir,
-                                                  target_size=(300, 300),
-                                                  batch_size=20,
-                                                  class_mode='categorical',
-                                                  shuffle=False)
-
-test_loss, test_acc = model.evaluate(test_generator2, steps=10)
-```
-
-Found 399 images belonging to 2 classes.
 
 10/10 [=====] - 42s 4s/step - loss: 0.0685 - acc: 0.9750
 
@@ -294,56 +95,16 @@ The test accuracy of the model on test dataset are 95% which is very high also.
 
 ### Then we calculate the predictions with the model and then make the confusion box
 
-```
-# calculate the predicitons
-preds  = model.predict(test_generator2, verbose = 1 )
-
-predictions = preds.copy()
-predictions[predictions <= 0.6] = 0
-predictions[predictions > 0.6] = 1
-
-cm = pd.DataFrame(data=confusion_matrix(test_labels[:,0], predictions[:,0], labels=[0,1]),index=["Actual Normal", "Actual Pneumonia"],
-columns=["Predicted Normal", "Predicted Pneumonia"])
-sns.heatmap(cm,annot=True,fmt="d")
-```
-
 
 ![confusion_box](https://raw.githubusercontent.com/sachenl/dsc-phase-4-project/main/image/fig%205%20confusionbox.png)
 
-```
-# print the scores for normal and pneumonia categories
-print(classification_report(y_true=test_labels[:,0],y_pred=predictions[:,0],target_names =['NORMAL', 'PNEUMONIA']))
-```
+
 ![scores](https://raw.githubusercontent.com/sachenl/dsc-phase-4-project/main/image/scores.png)
 
 The confusion box showes that the TP and TN prediction are much higher compare to the FN and FP results. The f1-score for both normal and pneumonia data are 0.79 and 0.9 which are very reasonble too.
 
 ### Finally, we  plot few of the examples of images with  percentage of predictions
 
-```
-# print some of the predicted images with percentage of predictions
-test_generator.reset()
-x=np.concatenate([test_generator.next()[0] for i in range(test_generator.__len__())])
-y=np.concatenate([test_generator.next()[1] for i in range(test_generator.__len__())])
-print(x.shape)
-print(y.shape)
-dic = {0:'NORMAL', 1:'PNEUMONIA'}
-plt.figure(figsize=(20,14))
-
-#for i in range(0+200, 9+200):
-for idx, i in enumerate(np.random.randint(1, 388, 6)):    
-    plt.subplot(2, 3, idx+1)
-    if preds[i, 0] >= 0.5: 
-        out = ('{:.2%} probability of being Pneumonia case'.format(preds[i][0]))
-      
-      
-    else: 
-        out = ('{:.2%} probability of being Normal case'.format(1-preds[i][0]))
-    plt.title(out +"\n Actual case :" + dic[y[i][0]])    
-    plt.imshow(np.squeeze(x[i]))
-    plt.axis('off')
-plt.show()
-```
 
 ![fig_6_plot_final](https://raw.githubusercontent.com/sachenl/dsc-phase-4-project/main/image/fig%206%20samples%20final.png)
 
