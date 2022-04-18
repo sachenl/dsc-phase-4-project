@@ -9,33 +9,6 @@ The medical dataset comes from Kermany et al. contains a set of x-ray images of 
 The dataset that we are going to use the image classification is the chese_xray which contains two categories: Pneumonia and Normal.The data was downloaded from https://data.mendeley.com/datasets/rscbjbr9sj/3 to the local drive and unzip. The data set is assigned into two folders (train and test) and contains subfoler for each of the category Pneumonia and Normal. In each of the folders, there are a lot of xray images. To check how many samples in each of the categories, we used the OS.listdir methods.
 
 
-
-```
-# load all the necessary libraries
-import numpy as np
-import os, shutil
-import pandas as pd
-from keras.preprocessing.image import ImageDataGenerator
-from tensorflow.keras.applications import VGG19
-from tensorflow.keras import layers
-from tensorflow.keras import models
-from tensorflow.keras import optimizers
-import matplotlib.pyplot as plt
-from sklearn.metrics import classification_report,confusion_matrix
-import seaborn as sns
-```
-
-```
-list_train_normal = os.listdir('chest_xray/train/normal')
-list_train_PNEUMONIA = os.listdir('chest_xray/train/PNEUMONIA')
-list_test_normal = os.listdir('chest_xray/test/normal')
-list_test_PNEUMONIA = os.listdir('chest_xray/test/PNEUMONIA')
-
-
-len(list_train_normal), len(list_train_PNEUMONIA), len(list_test_normal), len(list_test_PNEUMONIA)
-```
-(1349, 3884, 235, 390)
-
 In train folder, there are normal folder which contains 1349 images and PNEUMONIA folder which contains 3884 images. In test folder, there are normal folder which contains 235 images and PNEUMONIA folder which contains 390 images. The images in each folder is too large for the modeling since our local computer is not very powerful for the mulitple testing. We need to downsampling the dataset first to find the optimal model and parameter first. Then using the full dataset to train and test our model. Base on our earlier expience, we will use 20% of the total dataset to modeling our model. We also need to make 10% of the traning data to validation dataset.
 
 
@@ -50,73 +23,14 @@ In train folder, there are normal folder which contains 1349 images and PNEUMONI
 
 ### 1. Rebuild the data subset folder with 20% of the original images
 
-```
-# define the old and new direction of dataset
+Define the old and new direction of dataset and a new method to creat and transfer images to copy 20% of the training and testing images from the orignal folder. We also made a new folder for validation and randomly seleted 5% of the images from training folder.
 
-# define a new method to transfer the images between two folder
-def transfer(no_of_files, source, dest):
-    for i in range(no_of_files):
-        #Variable random_file stores the name of the random file chosen
-        random_file=np.random.choice(os.listdir(source))
-        # print("%d} %s"%(i+1,random_file))
-        source_file="%s/%s"%(source,random_file)
-        dest_file=dest
-        #"shutil.move" function moves file from one directory to another
-        shutil.copy(source_file,dest_file)
-
-
-# set the  propotion of images transfered to the new folders p_val, p_train, p_test and
-# define a new method to creat and transfer images
-def make_subset (old_dir, new_root_dir, p_val, p_train, p_test) :       
-
-    # make the root dir folder
-    os.mkdir(new_root_dir)
-
-    # define the name of subset to save all the images in different categories        
-    dir_names = ['train', 'val', 'test']
-    cat_names = ['normal', 'PNEUMONIA']
-    for d in dir_names:
-
-        new_dir = os.path.join(new_root_dir, d)
-        os.mkdir(new_dir)
-
-        # make the source dir to train and test folder, since we donot have validation in the original folder, 
-        # we make it to train folder 
-        if d == 'val':
-            source_dir = os.path.join(old_dir, 'train')
-        else:
-            source_dir = os.path.join(old_dir, d)
-
-
-        for cat in cat_names:
-            new_cat = os.path.join(new_dir, cat)
-            source = os.path.join(source_dir, cat )
-            os.mkdir(new_cat)
-            no_of_files = len(os.listdir(source))
-            # set the nunmber of copy to 20% from source folder. For the validation folder, copy 5% of the images of source
-            if d == 'val':
-                no_of_copy = int(p_val * no_of_files)
-                
-            if d == 'train':
-                no_of_copy = int(p_train * no_of_files) 
-                
-            if d == 'test':
-                no_of_copy = int(p_test * no_of_files )
-                
-            #print('d = ', d)    
-            print('copy {} of files in {} total files  from {} to {}'.format(no_of_copy,no_of_files, source, new_cat)) 
-            transfer(no_of_copy, source, new_cat)
-        
-old_dir = 'chest_xray/'
-new_root_dir = 'data_org_subset/'
-make_subset(old_dir, new_root_dir, p_val = 0.05, p_train = 0.2, p_test = 0.2)
-```
 
 ![copy20](https://raw.githubusercontent.com/sachenl/dsc-phase-4-project/main/image/copy%2020.png)
 
 
 
-Now, we copied 20% of the training and testing images from the orignal folder. We also made a new folder for validation and randomly seleted 5% of the images from training folder.
+
 
 ## 2. Define the train generator, validation generator and test generator.
 
