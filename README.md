@@ -39,9 +39,14 @@ We plot some of the images in the training dataset. However, I can not tell whic
 
 ![fig 2 samples](https://raw.githubusercontent.com/sachenl/dsc-phase-4-project/main/image/fig%202%20sample%20images.png)
 
+## 3. Build a baseline model
 
+![sequencial](https://raw.githubusercontent.com/sachenl/dsc-phase-4-project/main/image/sequencial.png)
+![result](https://raw.githubusercontent.com/sachenl/dsc-phase-4-project/main/image/own-results.png)
+![](https://raw.githubusercontent.com/sachenl/dsc-phase-4-project/main/image/own-acc.png)
 
-##  3. Build the model base on pretrain network VGG19 and fit the model to the trainning images.
+##  4. Build the model base on pretrain network VGG19 and fit the model to the trainning images.
+
 
 
 
@@ -61,7 +66,7 @@ The acc and loss curve of training gave us pretty good score and the validation 
 
 Then we save the current model.
 
-## 4. Retrain the model with full  dataset.
+## 5. Retrain the model with full  dataset.
 
 Now is the time to use our model for the full dataset. We  remade the folder of train, val, test folder for full dataset. 
 Transfer 90% of train images to new train and 10% of train images to new validation folder. 
@@ -84,7 +89,7 @@ Plot the accuracy of the model again.
 
 In this fitting, both training accuracy and validation accuracy are very high. Even though the fluctuation of validation accuracy is bigger than training accuracy, both accuracies generally had the same trend. 
 
-## 5. Evaluate the model with the test images.
+## 6. Evaluate the model with the test images.
 We first generate the test labels as the real class of the images.
 
 We then calculated the accuracy of the model on the testing images.
